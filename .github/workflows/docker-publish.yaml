@@ -24,7 +24,7 @@ permissions:
   packages: write
 
 env:
-  GHCR_IMAGE: ghcr.io/${{ github.repository }}
+  # GHCR 要求仓库名全小写，实际值在 Compute tags 步骤里用小写重算
   DOCKERHUB_IMAGE: tannic666/breeze-voice-studio
   DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -45,6 +45,9 @@ jobs:
       - name: Compute tags
         id: tags
         run: |
+          # ghcr.io 只接受小写仓库名（JunWan666 -> junwan666）
+          GHCR="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "GHCR_IMAGE=${GHCR}" >> "$GITHUB_ENV"
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             VERSION="${{ github.event.inputs.tag }}"
           elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
@@ -54,10 +57,10 @@ jobs:
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tags<<EOF" >> "$GITHUB_OUTPUT"
-          echo "${GHCR_IMAGE}:${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "${GHCR_IMAGE}:latest" >> "$GITHUB_OUTPUT"
+          echo "${GHCR}:${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "${GHCR}:latest" >> "$GITHUB_OUTPUT"
           MINOR="${VERSION%.*}"
-          if [ "$MINOR" != "$VERSION" ]; then echo "${GHCR_IMAGE}:${MINOR}" >> "$GITHUB_OUTPUT"; fi
+          if [ "$MINOR" != "$VERSION" ]; then echo "${GHCR}:${MINOR}" >> "$GITHUB_OUTPUT"; fi
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
