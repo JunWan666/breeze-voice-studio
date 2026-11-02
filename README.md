@@ -78,6 +78,22 @@ python app.py                     # 打开 http://127.0.0.1:8674
 1. **用自己的 API key（推荐）**：右上角齿轮 → 填 `brz_` 开头的 key → 保存并测试。key 存在浏览器里，音色库、合成、创作全部可用。
 2. **给服务器配一个 Breeze 登录态**：把浏览器里 `breezeblue.ai` 的 `breeze_blue_session` cookie 导出成 JSON，放到 `~/.config/breezeblue/cookies.json`（或用环境变量 `BREEZE_COOKIE_FILE` 指到别处）。这样**不填 key 也能浏览**官方音色库，但合成仍需要 key。
 
+### 方式二：Docker
+
+不装 Python，一条命令起服务：
+
+```bash
+docker compose up -d                 # 默认映射 8674 端口，数据目录 ./data
+
+# 或者不写 compose，手动来
+docker build -t breeze-voice .
+docker run -d --name breeze-voice -p 8674:8674 breeze-voice
+```
+
+镜像基于 `python:3.12-slim`，压缩后约 **45 MB**，以非 root 用户（uid 10001）运行，自带健康检查（每 30 秒探一次 `/healthz`），`restart: unless-stopped` 保证异常自启。
+
+想把服务端登录态也带进容器：把导出的 cookie 存成 `./data/cookies.json`（compose 已把 `./data` 挂到容器内的 `/data`），重启容器生效；不放就自动进入演示模式。
+
 ### 配置项
 
 | 环境变量 | 默认值 | 说明 |
@@ -138,6 +154,8 @@ breeze-voice-studio/
 ├── templates/index.html   # 单文件前端（内联 CSS + JS，5 个标签页）
 ├── static/demo-preview.mp3# 演示模式的试听占位音
 ├── docs/                  # README 用的 logo 与截图
+├── Dockerfile             # python:3.12-slim + waitress，非 root 运行
+├── docker-compose.yml     # 端口映射 + /data 挂载 + 自动重启
 └── requirements.txt
 ```
 

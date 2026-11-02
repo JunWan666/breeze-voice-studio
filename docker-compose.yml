@@ -1,0 +1,17 @@
+services:
+  breeze-voice:
+    build: .
+    image: junwan666/breeze-voice-studio:latest
+    container_name: breeze-voice
+    ports:
+      # 宿端口可用 PORT 覆盖：PORT=9000 docker compose up -d
+      - "${PORT:-8674}:8674"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8674
+      # 可选：把浏览器导出的 Breeze 登录态放到 ./data/cookies.json，
+      # 这样不填 key 也能浏览官方音色库；不放则自动进入演示模式
+      - BREEZE_COOKIE_FILE=/data/cookies.json
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
