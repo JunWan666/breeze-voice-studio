@@ -1,0 +1,140 @@
+name: Build & Push Docker Image
+
+# 用途：把源码构建成多架构（amd64 + arm64）镜像并发布
+# 触发方式：① push v* 标签（自动） ② 网页手动 Run workflow（可自定义 tag）
+#
+# 发布目标：
+#   - GHCR（ghcr.io/<owner>/<repo>）：用内置 GITHUB_TOKEN，零配置即可用
+#   - Docker Hub（tannic666/breeze-voice-studio）：需要仓库 secret DOCKERHUB_TOKEN，
+#     没配置时这一步自动跳过，不影响 GHCR
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "镜像 tag（留空则用 latest）"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  GHCR_IMAGE: ghcr.io/${{ github.repository }}
+  DOCKERHUB_IMAGE: tannic666/breeze-voice-studio
+  DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+jobs:
+  docker:
+    name: Build multi-arch image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute tags
+        id: tags
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo "${GHCR_IMAGE}:${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "${GHCR_IMAGE}:latest" >> "$GITHUB_OUTPUT"
+          MINOR="${VERSION%.*}"
+          if [ "$MINOR" != "$VERSION" ]; then echo "${GHCR_IMAGE}:${MINOR}" >> "$GITHUB_OUTPUT"; fi
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.title=Breeze 音色试听台
+            org.opencontainers.image.description=Breeze Blue 音色库的本地试听台，自带 OpenAI 兼容语音接口
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.tags.outputs.version }}
+            org.opencontainers.image.licenses=MIT
+
+      # ---------- 下面几步只在配置了 DOCKERHUB_TOKEN 时执行 ----------
+      - name: Login to Docker Hub
+        if: env.DH_TOKEN != ''
+        uses: docker/login-action@v3
+        with:
+          username: tannic666
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push to Docker Hub
+        if: env.DH_TOKEN != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_IMAGE }}:${{ steps.tags.outputs.version }}
+            ${{ env.DOCKERHUB_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Make Docker Hub repository public
+        if: env.DH_TOKEN != ''
+        continue-on-error: true
+        run: |
+          # Docker Hub 首次推送会自动建仓（默认私有），这里顺手改成公开
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X PATCH \
+              "https://hub.docker.com/v2/repositories/${DOCKERHUB_IMAGE}/" \
+              -H "Authorization: Bearer ${DH_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              -d '{"is_private": false}')
+            echo "attempt $i -> HTTP $code"
+            [ "$code" = "200" ] && break
+            sleep 10
+          done
+
+      - name: Summary
+        run: |
+          {
+            echo "### 镜像已发布"
+            echo ""
+            echo '```'
+            echo "docker pull ${GHCR_IMAGE}:${{ steps.tags.outputs.version }}"
+            echo '```'
+            if [ -n "${DH_TOKEN}" ]; then
+              echo ""
+              echo "Docker Hub：\`${DOCKERHUB_IMAGE}:${{ steps.tags.outputs.version }}\`"
+            else
+              echo ""
+              echo "> 未配置 \`DOCKERHUB_TOKEN\`，本次只发布了 GHCR。"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
