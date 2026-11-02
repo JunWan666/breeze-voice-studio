@@ -14,6 +14,7 @@
     <img src="https://img.shields.io/badge/音色库-搜索%20%7C%20筛选%20%7C%20试听-2563EB?style=flat-square" alt="音色库" />
     <img src="https://img.shields.io/badge/音色创作-一句话生成-C084FC?style=flat-square" alt="音色创作" />
     <img src="https://img.shields.io/badge/密钥-只存浏览器-12A781?style=flat-square" alt="密钥只存浏览器" />
+    <img src="https://img.shields.io/docker/pulls/tannic666/breeze-voice-studio?style=flat-square&logo=docker&logoColor=white" alt="Docker Pulls" />
     <img src="https://img.shields.io/badge/Docker-amd64%20%7C%20arm64-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
     <img src="https://img.shields.io/badge/演示模式-开箱即跑-D97706?style=flat-square" alt="演示模式" />
   </p>
@@ -81,9 +82,14 @@ python app.py                     # 打开 http://127.0.0.1:8674
 
 ### 方式二：Docker
 
-不装 Python，直接用现成镜像（多架构，`amd64` / `arm64` 都支持，NAS 和树莓派也能跑）：
+不装 Python，直接用现成镜像（多架构，`amd64` / `arm64` 都支持，NAS 和树莓派也能跑）。同一个镜像发在两个仓库，任选其一：
 
 ```bash
+# Docker Hub
+docker run -d --name breeze-voice -p 8674:8674 \
+  tannic666/breeze-voice-studio:latest
+
+# 或者 GHCR（GitHub 自带镜像仓库，内容完全一样）
 docker run -d --name breeze-voice -p 8674:8674 \
   ghcr.io/junwan666/breeze-voice-studio:latest
 ```
