@@ -14,6 +14,7 @@
     <img src="https://img.shields.io/badge/音色库-搜索%20%7C%20筛选%20%7C%20试听-2563EB?style=flat-square" alt="音色库" />
     <img src="https://img.shields.io/badge/音色创作-一句话生成-C084FC?style=flat-square" alt="音色创作" />
     <img src="https://img.shields.io/badge/密钥-只存浏览器-12A781?style=flat-square" alt="密钥只存浏览器" />
+    <img src="https://img.shields.io/badge/Docker-amd64%20%7C%20arm64-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
     <img src="https://img.shields.io/badge/演示模式-开箱即跑-D97706?style=flat-square" alt="演示模式" />
   </p>
 </div>
@@ -80,17 +81,26 @@ python app.py                     # 打开 http://127.0.0.1:8674
 
 ### 方式二：Docker
 
-不装 Python，一条命令起服务：
+不装 Python，直接用现成镜像（多架构，`amd64` / `arm64` 都支持，NAS 和树莓派也能跑）：
+
+```bash
+docker run -d --name breeze-voice -p 8674:8674 \
+  ghcr.io/junwan666/breeze-voice-studio:latest
+```
+
+想自己从源码构建：
 
 ```bash
 docker compose up -d                 # 默认映射 8674 端口，数据目录 ./data
-
-# 或者不写 compose，手动来
-docker build -t breeze-voice .
-docker run -d --name breeze-voice -p 8674:8674 breeze-voice
+# 或
+docker build -t breeze-voice . && docker run -d -p 8674:8674 breeze-voice
 ```
 
+宿主机端口被占用时用 `PORT=9000 docker compose up -d`。
+
 镜像基于 `python:3.12-slim`，压缩后约 **45 MB**，以非 root 用户（uid 10001）运行，自带健康检查（每 30 秒探一次 `/healthz`），`restart: unless-stopped` 保证异常自启。
+
+镜像由 GitHub Actions 在打 `v*` 标签时自动构建，多架构并行发布；也可以在仓库的 **Actions → Build & Push Docker Image → Run workflow** 手动触发，并指定任意 tag。
 
 想把服务端登录态也带进容器：把导出的 cookie 存成 `./data/cookies.json`（compose 已把 `./data` 挂到容器内的 `/data`），重启容器生效；不放就自动进入演示模式。
 
@@ -156,6 +166,7 @@ breeze-voice-studio/
 ├── docs/                  # README 用的 logo 与截图
 ├── Dockerfile             # python:3.12-slim + waitress，非 root 运行
 ├── docker-compose.yml     # 端口映射 + /data 挂载 + 自动重启
+├── .github/workflows/     # 打 v* 标签自动构建多架构镜像（GHCR / Docker Hub）
 └── requirements.txt
 ```
 
