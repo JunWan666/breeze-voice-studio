@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Breeze 音色试听台</title>
+<style>
+  :root{
+    --bg:#f8f4ec; --ink:#3d362d; --ink-2:#655b4d; --ink-3:#7c6f60;
+    --accent:#c27a4d; --accent-2:#b5653a; --line:rgba(61,54,45,.13);
+    --card:#fffdf8; --warm:#faf4ea; --ok:#4b7f52; --bad:#a8462c;
+    --shadow:0 14px 34px -26px rgba(90,70,45,.42);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    color:var(--ink); background:var(--bg); min-height:100dvh; overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";position:fixed;inset:-10%;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(34% 28% at 10% 6%, rgba(226,168,110,.24), transparent 70%),
+      radial-gradient(30% 26% at 94% 92%, rgba(194,122,77,.14), transparent 72%);
+    filter:blur(30px);
+  }
+  html,body{height:100%;overflow:hidden}
+  .shell{position:relative;z-index:1;max-width:none;margin:0;padding:12px 16px 10px;
+    height:100dvh;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+
+  /* 顶栏 */
+  .topbar{display:flex;align-items:center;gap:16px;flex-wrap:nowrap;margin-bottom:0;flex:none}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:15.5px;color:var(--accent-2)}
+  .brand svg{stroke:var(--accent);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .spacer{flex:1}
+  .demochip{display:inline-flex;align-items:center;font-size:11.5px;padding:4px 9px;border-radius:999px;
+    color:#8d4a26;background:rgba(194,122,77,.12);border:1px solid rgba(194,122,77,.32);white-space:nowrap}
+  .keystate{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-3);
+    white-space:nowrap;padding:0;cursor:default;user-select:none}
+  .keystate .dot{width:8px;height:8px}
+  .iconbtn{width:38px;height:38px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:11px;border:1px solid var(--line);background:#fff;color:var(--ink-2);cursor:pointer;
+    box-shadow:0 4px 12px -8px rgba(90,70,45,.5);transition:.16s}
+  .iconbtn:hover{color:var(--accent-2);border-color:rgba(194,122,77,.5);transform:translateY(-1px)}
+  .iconbtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .dot{width:7px;height:7px;border-radius:50%;background:#c3b8a7;flex:none}
+  .dot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(75,127,82,.16)}
+  .dot.warn{background:var(--accent)}
+
+  /* Tabs */
+  .tabs{display:flex;gap:4px;flex:none;padding:4px;border-radius:13px;
+    background:rgba(255,255,255,.62);border:1px solid var(--line);overflow:visible}
+  .tab{appearance:none;background:none;border:0;padding:8px 15px;font-size:13.5px;color:#5a5044;cursor:pointer;
+    white-space:nowrap;font-weight:500;border-radius:9px;transition:.16s;
+    display:inline-flex;align-items:center;gap:6px}
+  .tab svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+  .tab:hover{color:var(--accent-2);background:rgba(194,122,77,.09)}
+  .tab.active{background:linear-gradient(180deg,#c07a4a,#a85c33);color:#fff;font-weight:600;
+    box-shadow:0 8px 16px -10px rgba(168,92,51,.95)}
+  .tab.active svg{opacity:1}
+  .lbl-s{display:none}
+
+  /* 通用卡片 */
+  .card{background:var(--card);border:1px solid rgba(255,255,255,.85);border-radius:16px;box-shadow:var(--shadow)}
+  .panel{padding:18px 20px}
+
+  /* 三个面板撑满剩余高度；页面本身永不滚动，只在需要的地方内部滚 */
+  #tab-lib,#tab-create,#tab-byid,#tab-mine,#tab-docs{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+
+  /* 工具条 */
+  .toolbar{display:grid;grid-template-columns:1.9fr minmax(0,.8fr) minmax(0,.8fr) minmax(0,.8fr) minmax(0,.8fr);gap:9px;margin-bottom:0}
+  .filters{display:contents}
+  .filter-toggle{display:none}
+  .toolcard{flex:none;padding:11px 14px}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .field label{font-size:11.5px;color:var(--ink-3);letter-spacing:.03em}
+  input[type=text],input[type=password],textarea,select{
+    width:100%;padding:10px 12px;font-size:14px;color:var(--ink);background:rgba(255,255,255,.85);
+    border:1px solid var(--line);border-radius:10px;outline:none;transition:border-color .16s, box-shadow .16s;
+    font-family:inherit;
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(194,122,77,.14)}
+  textarea{resize:vertical;min-height:74px;line-height:1.6}
+
+  .btn{appearance:none;border:1px solid transparent;border-radius:10px;padding:10px 16px;font-size:13.5px;font-weight:600;
+    cursor:pointer;transition:transform .13s, filter .16s, background .16s;font-family:inherit}
+  .btn:active{transform:scale(.985)}
+  .btn-pri{background:linear-gradient(180deg,#c07a4a,#a85c33);color:#fff;box-shadow:0 10px 22px -16px rgba(168,92,51,.95)}
+  .btn-pri:hover{filter:brightness(1.05)}
+  .btn-ghost{background:rgba(255,255,255,.8);border-color:var(--line);color:var(--ink-2)}
+  .btn-ghost:hover{border-color:rgba(194,122,77,.45);color:var(--accent-2)}
+  .btn-sm{padding:7px 12px;font-size:12.5px;border-radius:9px}
+  .btn:disabled{opacity:.55;cursor:not-allowed;filter:none;transform:none}
+
+  /* 音色网格 */
+  .vgrid{flex:1;min-height:0;display:grid;gap:10px;overflow:hidden;align-content:stretch}
+  .vcard{padding:12px 13px;display:flex;flex-direction:column;gap:7px;min-height:0;overflow:hidden;
+    transition:box-shadow .18s, transform .18s}
+  .vcard:hover{box-shadow:0 18px 34px -24px rgba(90,70,45,.5);transform:translateY(-1px)}
+  .vcard h4{margin:0;font-size:14px;font-weight:600;line-height:1.3;word-break:break-word;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta{display:flex;flex-wrap:nowrap;gap:4px;overflow:hidden}
+  .pill{font-size:11px;padding:3px 8px;border-radius:999px;background:var(--warm);color:var(--ink-2);
+    border:1px solid rgba(194,122,77,.14);white-space:nowrap;flex:none}
+  .pill.lang{color:var(--accent-2);border-color:rgba(194,122,77,.3)}
+  .vdesc{font-size:12.2px;color:var(--ink-3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;
+    -webkit-box-orient:vertical;overflow:hidden}
+  .vactions{display:flex;gap:6px;margin-top:auto}
+  .vactions .btn{flex:1;padding:6px 10px;font-size:12px}
+  audio{width:100%;height:30px;display:block}
+  .noaudio{font-size:11.5px;color:var(--ink-3);height:30px;display:flex;align-items:center}
+
+  .pager{flex:none;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:nowrap}
+  .pager .count{font-size:12.5px;color:var(--ink-3);white-space:nowrap}
+  .pgbtn{appearance:none;background:rgba(255,255,255,.85);border:1px solid var(--line);border-radius:9px;
+    padding:7px 14px;font-size:12.5px;color:var(--ink-2);cursor:pointer;transition:.16s;font-family:inherit;font-weight:500}
+  .pgbtn:hover:not(:disabled){border-color:rgba(194,122,77,.45);color:var(--accent-2)}
+  .pgbtn:disabled{opacity:.4;cursor:not-allowed}
+  .loadmore{display:flex;justify-content:center;margin-top:18px;gap:10px;align-items:center;flex-wrap:wrap}
+  .count{font-size:12.5px;color:var(--ink-3)}
+
+  /* 创作页 */
+  #tab-create .create{flex:1;min-height:0;display:grid;grid-template-columns:1.02fr 1fr;gap:12px;align-items:stretch}
+  #tab-create .card{min-height:0;display:flex;flex-direction:column;overflow:auto}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{font-size:11.5px;padding:5px 10px;border-radius:999px;background:rgba(194,122,77,.09);
+    border:1px solid rgba(194,122,77,.2);color:#8d4a26;cursor:pointer;transition:.16s}
+  .chip:hover{background:rgba(194,122,77,.17)}
+  .cands{display:grid;gap:10px;flex:1;min-height:0;overflow-y:auto;align-content:start;padding-right:3px}
+  .cand{padding:12px 14px;border-radius:12px;background:var(--warm);border:1px solid rgba(194,122,77,.14)}
+  .cand .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .cand .row b{font-size:13px}
+  .cand .row span{font-size:11.5px;color:var(--ink-3)}
+
+  /* 记录 */
+  .clips{display:grid;gap:10px;flex:1;min-height:0;overflow-y:auto;align-content:start;padding-right:3px}
+  .clip{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 14px;border-radius:12px;
+    background:var(--warm);border:1px solid rgba(194,122,77,.12)}
+  .clip .t{font-size:13px;line-height:1.5;word-break:break-word}
+  .clip .s{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+  .clip .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .empty{padding:26px 14px;text-align:center;color:var(--ink-3);font-size:13.5px;line-height:1.7}
+  .empty.es{display:flex;flex-direction:column;align-items:center;gap:8px;padding:30px 16px;text-align:left}
+  .empty.es svg{width:34px;height:34px;stroke:rgba(194,122,77,.5);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;margin-bottom:2px}
+  .empty.es p{margin:0;font-size:14px;color:var(--ink-2);font-weight:600}
+  .empty.es span{font-size:12.5px}
+  .empty.es ul{margin:10px 0 0;padding:12px 16px;list-style:none;width:100%;max-width:340px;
+    background:var(--warm);border:1px dashed rgba(194,122,77,.26);border-radius:10px;display:grid;gap:7px}
+  .empty.es li{font-size:12.2px;color:var(--ink-3);line-height:1.6}
+  .empty.es li b{color:var(--ink-2);font-weight:600}
+
+  #tab-mine .card{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .switchrow{flex:none;display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:12px;
+    background:var(--warm);border:1px solid rgba(194,122,77,.16);margin-bottom:14px}
+  .switch{position:relative;flex:none;width:44px;height:25px;border-radius:999px;background:#d9cfc0;cursor:pointer;transition:.2s;border:0}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;
+    transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+  .switch.on{background:var(--accent)}
+  .switch.on::after{transform:translateX(19px)}
+  .switchrow div{font-size:12.8px;color:var(--ink-2);line-height:1.65}
+  .switchrow b{display:block;font-size:13.5px;color:var(--ink);margin-bottom:3px}
+
+  /* 按 ID 合成 */
+  #tab-byid .create{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1.15fr;gap:12px;align-items:stretch}
+  #tab-byid .card{min-height:0;display:flex;flex-direction:column;overflow:auto}
+  .byid-card{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+  .byid-empty{font-size:12.8px;color:var(--ink-3);line-height:1.7;padding:16px;border-radius:11px;
+    background:var(--warm);border:1px dashed rgba(194,122,77,.26)}
+  .byid-voice{padding:14px;border-radius:12px;background:var(--warm);border:1px solid rgba(194,122,77,.18)}
+  .byid-voice h4{margin:0 0 7px;font-size:14.5px}
+  .byid-voice .idline{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--accent-2);
+    margin-bottom:7px;word-break:break-all}
+  .byid-voice .d{font-size:12.2px;color:var(--ink-3);line-height:1.6;margin:7px 0 0}
+  .byid-tip{font-size:11.8px;color:var(--ink-3);line-height:1.6;margin:10px 0 0}
+  .copyid{flex:none;width:34px;padding:6px 0;font-size:11px;letter-spacing:.02em}
+
+  /* 文档页 */
+  #tab-docs .doccard{flex:1;min-height:0;display:flex;flex-direction:column;padding:0;overflow:hidden}
+  .docwrap{flex:1;min-height:0;overflow-y:auto;padding:20px 26px 30px}
+  .doc{display:grid;grid-template-columns:186px minmax(0,1fr);gap:30px;align-items:start}
+  .doctoc{position:sticky;top:0;display:flex;flex-direction:column;gap:1px;padding-top:6px;
+    border-right:1px solid var(--line)}
+  .doctoc a{font-size:12.5px;color:var(--ink-3);text-decoration:none;padding:5px 10px;
+    border-left:2px solid transparent;margin-left:-1px}
+  .doctoc a:hover{color:var(--accent-2);background:rgba(194,122,77,.07)}
+  .doctoc a.on{color:var(--accent-2);border-left-color:var(--accent);background:rgba(194,122,77,.1);font-weight:600}
+  .docbody{min-width:0;max-width:980px}
+  .docbody h2{margin:0 0 12px;font-size:20px;font-weight:600;letter-spacing:-.3px}
+  .docbody h3{margin:26px 0 10px;font-size:15px;font-weight:600;padding-top:14px;border-top:1px solid var(--line)}
+  .docbody h3:first-of-type{border-top:0;padding-top:0}
+  .docbody p{margin:0 0 10px;font-size:13.4px;color:var(--ink-2);line-height:1.75}
+  .docbody p.lead{font-size:13.8px;color:var(--ink-2)}
+  .docbody p.note{font-size:12.4px;color:var(--ink-3);background:rgba(194,122,77,.07);
+    border-left:3px solid rgba(194,122,77,.45);border-radius:0 8px 8px 0;padding:8px 12px}
+  .docbody code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.2px;
+    background:rgba(194,122,77,.1);color:#8d4a26;padding:1px 5px;border-radius:5px}
+  .docbody ul.doclist{margin:0;padding-left:20px;display:grid;gap:7px}
+  .docbody ul.doclist li{font-size:13px;color:var(--ink-2);line-height:1.7}
+  .code{position:relative;margin:0 0 12px;border-radius:11px;background:#2f2a24;overflow:hidden}
+  .code pre{margin:0;padding:14px 16px;overflow-x:auto;color:#f2e9dc;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.8px;line-height:1.75}
+  .code .cp{position:absolute;top:7px;right:7px;font-size:11px;padding:4px 9px;border-radius:7px;
+    background:rgba(255,255,255,.14);color:#f2e9dc;border:1px solid rgba(255,255,255,.18);
+    cursor:pointer;font-family:inherit;transition:.16s}
+  .code .cp:hover{background:rgba(255,255,255,.26)}
+  .apitable{width:100%;border-collapse:collapse;margin:0 0 12px;font-size:12.8px}
+  .apitable th,.apitable td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  .apitable th{font-size:12px;color:var(--ink-3);font-weight:600;background:rgba(250,244,234,.7)}
+  .apitable td{color:var(--ink-2);line-height:1.65}
+  .apitable tr:last-child td{border-bottom:0}
+
+  /* 设置抽屉 */
+  .drawer{position:fixed;inset:0;z-index:30;display:none;background:rgba(61,54,45,.3)}
+  .drawer.show{display:block}
+  .drawer-panel{position:absolute;top:0;right:0;height:100%;width:min(430px,100%);
+    background:var(--card);border-left:1px solid rgba(255,255,255,.9);
+    box-shadow:-24px 0 60px -30px rgba(40,30,20,.55);
+    display:flex;flex-direction:column;transform:translateX(16px);opacity:0;transition:.22s}
+  .drawer.show .drawer-panel{transform:none;opacity:1}
+  .drawer-head{flex:none;display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px;border-bottom:1px solid var(--line)}
+  .drawer-head h3{margin:0;font-size:16px;font-weight:600}
+  .drawer-body{flex:1;min-height:0;overflow-y:auto;padding:18px 20px 26px;display:flex;flex-direction:column;gap:16px}
+  .dsection{padding:14px 15px;border-radius:13px;background:var(--warm);border:1px solid rgba(194,122,77,.16)}
+  .dsection h4{margin:0 0 4px;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px}
+  .dsection p{margin:0 0 11px;font-size:12.2px;color:var(--ink-3);line-height:1.6}
+  .dsection .field{margin-bottom:10px}
+  .kstatus{display:flex;align-items:center;gap:7px;font-size:12.2px;margin-top:9px;color:var(--ink-3);line-height:1.5}
+  .kstatus.ok{color:var(--ok)}
+  .kstatus.bad{color:var(--bad)}
+  .drow{display:flex;gap:8px;flex-wrap:wrap}
+  .lnk{font-size:12.2px;color:var(--accent-2);text-decoration:none;border-bottom:1px dashed rgba(194,122,77,.5)}
+  .lnk:hover{border-bottom-style:solid}
+
+  /* 通用弹层 */
+  .modal{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:18px;
+    background:rgba(61,54,45,.34);backdrop-filter:blur(3px)}
+  .modal.show{display:flex}
+  .modal-box{width:100%;max-width:520px;max-height:92vh;overflow:auto;background:var(--card);border-radius:18px;
+    padding:22px 22px 20px;box-shadow:0 28px 60px -28px rgba(40,30,20,.55)}
+  .modal-box h3{margin:0 0 6px;font-size:17px}
+  .modal-box p.hint{margin:0 0 16px;font-size:12.5px;color:var(--ink-3);line-height:1.65}
+  .modal-box .field{margin-bottom:12px}
+  .modal-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+  .krow{display:flex;gap:8px}
+  .krow input{flex:1}
+  .notice{font-size:12.2px;color:var(--ink-3);line-height:1.7;background:rgba(194,122,77,.07);
+    border:1px dashed rgba(194,122,77,.28);border-radius:10px;padding:10px 12px;margin-top:4px}
+  .notice a{color:var(--accent-2)}
+
+  #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,14px);z-index:40;max-width:min(92vw,520px);
+    padding:11px 20px;border-radius:999px;font-size:13.5px;color:#fff;background:rgba(61,54,45,.94);
+    box-shadow:0 12px 30px -14px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;text-align:center}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  #toast.bad{background:rgba(150,58,36,.96)}
+
+  .foot{flex:none;margin-top:0;padding-top:2px;text-align:center;font-size:11.5px;color:var(--ink-3);line-height:1.5}
+  .hidden{display:none!important}
+
+  @media(max-width:900px){
+    .toolbar{grid-template-columns:1fr 1fr}
+    .toolbar .field:first-child{grid-column:1/-1}
+    .create{grid-template-columns:1fr}
+  }
+  @media(max-width:620px){
+    .shell{padding:10px 12px 8px;gap:8px}
+    /* 顶栏两行：品牌 + 状态 + 齿轮 / tabs 独占一行 */
+    .topbar{flex-wrap:wrap;gap:8px;row-gap:8px}
+    .brand{order:1;font-size:14px}
+    .spacer{order:2}
+    .keystate{order:3;font-size:11.5px}
+    .iconbtn{order:4;width:34px;height:34px;border-radius:10px}
+    .tabs{order:5;flex:1 0 100%;padding:3px;border-radius:11px}
+    .tab{flex:1 1 0;min-width:0;justify-content:center;padding:6px 2px;font-size:11.5px;gap:3px}
+    .lbl{display:none}
+    .lbl-s{display:inline}
+    .tab svg{width:12px;height:12px}
+    /* 文档页：收起目录，正文单列 */
+    .doc{grid-template-columns:1fr;gap:0}
+    .doctoc{display:none}
+    .docwrap{padding:14px 14px 22px}
+    .docbody h2{font-size:17px}
+    .docbody h3{font-size:14px;margin-top:20px}
+    .docbody p,.docbody p.lead{font-size:12.8px}
+    .code pre{font-size:11.3px;padding:11px 12px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+    .code{display:flex;flex-direction:column}
+    .code .cp{position:static;order:0;align-self:flex-end;margin:7px 8px 0;font-size:10.5px;padding:3px 9px}
+    .code pre{order:1}
+    .apitable{font-size:11.6px}
+    .apitable th,.apitable td{padding:7px 8px}
+    #tab-byid .create{grid-template-columns:1fr}
+    .toolbar{grid-template-columns:1fr auto;gap:8px}
+    .filters{display:none;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:8px}
+    .filters.open{display:grid}
+    .filter-toggle{display:block}
+    .vcard{padding:9px 10px;gap:5px}
+    .vcard h4{font-size:12.8px}
+    .vdesc{display:none}
+    .pill{font-size:10px;padding:2px 6px}
+    audio{height:26px}
+    .vactions .btn{padding:5px 8px;font-size:11.5px}
+    .pager{gap:6px}
+    .pgbtn{padding:6px 9px;font-size:11.5px}
+    #refreshBtn{display:none}
+    .pager .count{font-size:11px}
+    .foot{display:none}
+    #tab-create .create{grid-template-columns:1fr}
+    .switchrow{padding:10px 12px}
+    .clip{grid-template-columns:1fr}
+    .clip .acts{justify-content:flex-start}
+    .modal-box{padding:18px}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="21" height="21" viewBox="0 0 24 24"><path d="M4 14a8 8 0 0 1 8-8h8"/><path d="M9 18h11"/><path d="M4 10c0 5.5 4.5 10 10 10"/><circle cx="9.5" cy="9.5" r="1"/></svg>
+      Breeze 音色试听台
+    </div>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="lib" role="tab">
+        <svg viewBox="0 0 24 24"><path d="M4 14a8 8 0 0 1 8-8h8"/><path d="M9 18h11"/><path d="M4 10c0 5.5 4.5 10 10 10"/><circle cx="9.5" cy="9.5" r=".8"/></svg><span class="lbl">官方音色库</span><span class="lbl-s">音色库</span></button>
+      <button class="tab" data-tab="create" role="tab">
+        <svg viewBox="0 0 24 24"><path d="m12 3 1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5 10.1 7.6 12 3Z"/><path d="M18 15.5 19 18l2.5 1L19 20l-1 2.5L17 20l-2.5-1L17 18l1-2.5Z"/></svg><span class="lbl">音色创作</span><span class="lbl-s">创作</span></button>
+      <button class="tab" data-tab="byid" role="tab">
+        <svg viewBox="0 0 24 24"><path d="M4 7V5h16v2"/><rect x="6" y="9" width="12" height="11" rx="2"/><path d="M10 13v3M14 13v3"/></svg><span class="lbl">按 ID 合成</span><span class="lbl-s">ID 合成</span></button>
+      <button class="tab" data-tab="mine" role="tab">
+        <svg viewBox="0 0 24 24"><path d="M3 14v-3a9 9 0 0 1 18 0v3"/><path d="M21 16a2 2 0 0 1-2 2h-1v-5h1a2 2 0 0 1 2 2Z"/><path d="M3 16a2 2 0 0 0 2 2h1v-5H5a2 2 0 0 0-2 2Z"/></svg><span class="lbl">我的试听</span><span class="lbl-s">我的</span></button>
+      <button class="tab" data-tab="docs" role="tab">
+        <svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M14 3v5h5"/><path d="M8 13h8M8 17h5"/></svg><span class="lbl">接口文档</span><span class="lbl-s">文档</span></button>
+    </nav>
+
+    <div class="spacer"></div>
+    <span class="demochip hidden" id="demoChip" title="没有配置 Breeze cookie 或自己的 key，音色库显示的是内置示例数据">示例数据</span>
+    <span class="keystate" id="keystate"><i class="dot" id="keyStateDot"></i><span id="keyStateText">未配置 API key</span></span>
+    <button class="iconbtn" id="settingsBtn" title="设置" aria-label="设置">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+    </button>
+  </header>
+
+  <!-- 音色库 -->
+  <section id="tab-lib">
+    <div class="card panel toolcard">
+      <div class="toolbar">
+        <div class="field"><label>搜索音色</label>
+          <input id="q" type="text" placeholder="名字 / 风格，例如：温柔女声、新闻播报" autocomplete="off"></div>
+        <div class="filters" id="filters">
+        <div class="field"><label>语言</label><select id="lang"></select></div>
+        <div class="field"><label>性别</label><select id="gender">
+          <option value="">不限</option><option value="female">女声</option>
+          <option value="male">男声</option><option value="neutral">中性</option></select></div>
+        <div class="field"><label>场景</label><select id="category">
+          <option value="">不限</option>
+          <option value="narration">旁白</option><option value="social-media">短视频</option>
+          <option value="ads-brand">广告品牌</option><option value="podcast">播客</option>
+          <option value="learning">教学</option><option value="support-agents">客服</option>
+          <option value="roleplay">角色扮演</option><option value="gaming">游戏</option>
+          <option value="animation">动画</option><option value="cinematic">影视</option></select></div>
+        <div class="field"><label>排序</label><select id="sort">
+          <option value="trend">今日热门</option><option value="">默认</option></select></div>
+        </div>
+        <button class="pgbtn filter-toggle" id="filterToggle">筛选</button>
+      </div>
+    </div>
+    <div class="vgrid" id="vgrid"></div>
+    <div class="pager">
+      <button class="pgbtn" id="prevBtn" disabled>‹ 上一页</button>
+      <span class="count" id="libCount">正在读取音色库…</span>
+      <button class="pgbtn" id="nextBtn" disabled>下一页 ›</button>
+      <button class="pgbtn" id="refreshBtn">刷新</button>
+    </div>
+  </section>
+
+  <!-- 创作 -->
+  <section id="tab-create" class="hidden">
+    <div class="create">
+      <div class="card panel">
+        <div class="field" style="margin-bottom:12px">
+          <label>你想要什么音色？</label>
+          <textarea id="dDesc" placeholder="例如：二十五六岁的年轻女性，声音温柔略带一点气声，普通话标准，语速偏慢，笑起来很亲切"></textarea>
+        </div>
+        <div class="chips" id="descChips">
+          <span class="chip">二十多岁的温柔女声，语速偏慢，普通话标准</span>
+          <span class="chip">沉稳的中年男声，低沉有磁性，适合纪录片旁白</span>
+          <span class="chip">活泼的少女音，语速偏快，带笑意，适合短视频</span>
+          <span class="chip">温柔治愈的成熟女声，气声多，适合睡前故事</span>
+          <span class="chip">年轻男声，清亮干净，适合科普解说</span>
+        </div>
+        <div class="field" style="margin-top:14px;margin-bottom:12px">
+          <label>试听台词（这段文字会被念出来）</label>
+          <textarea id="dText" style="min-height:60px">晚风轻轻吹过，路灯一盏一盏亮起来。今天的你，辛苦了。</textarea>
+        </div>
+        <div class="toolbar" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+          <div class="field"><label>候选数量</label><select id="dCount">
+            <option value="2">2 个</option><option value="1">1 个</option><option value="3">3 个</option></select></div>
+          <div class="field"><label>模型</label><select id="dModel"></select></div>
+        </div>
+        <div class="loadmore" style="margin-top:4px;justify-content:flex-start">
+          <button class="btn btn-pri" id="designBtn">生成音色候选</button>
+          <span class="count" id="designHint"></span>
+        </div>
+      </div>
+      <div class="card panel">
+        <label style="font-size:11.5px;color:var(--ink-3)">候选结果</label>
+        <div class="cands" id="cands" style="margin-top:10px">
+          <div class="empty es">
+            <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M5 11v1a7 7 0 0 0 14 0v-1"/><path d="M12 19v3"/></svg>
+            <p>还没有生成候选</p>
+            <span>写好描述，点左边「生成音色候选」试试～</span>
+            <ul>
+              <li><b>年龄 + 性别</b>：二十五六岁的年轻女性</li>
+              <li><b>音色质感</b>：温柔带一点气声、清亮干净、低沉有磁性</li>
+              <li><b>语速 + 语言</b>：语速偏慢、普通话标准</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 按 ID 合成 -->
+  <section id="tab-byid" class="hidden">
+    <div class="create">
+      <div class="card panel">
+        <div class="field" style="margin-bottom:10px">
+          <label>音色 ID（voc_ 开头，别人的分享 ID 也可以）</label>
+          <div class="krow">
+            <input id="byIdInput" type="text" placeholder="例如 voc_rh6e8hdbraz6" autocomplete="off" spellcheck="false">
+            <button class="btn btn-ghost btn-sm" id="byIdLookup">查一下</button>
+          </div>
+        </div>
+        <div id="byIdInfo" class="byid-card">
+          <div class="byid-empty">填入音色 ID 后点「查一下」，这里会显示它是谁的声音</div>
+        </div>
+        <p class="byid-tip">音色 ID 可以从音色库卡片的「复制 ID」拿到，也可以问分享给你的人。</p>
+      </div>
+
+      <div class="card panel">
+        <div class="field" style="margin-bottom:10px">
+          <label>要念的文字</label>
+          <textarea id="byIdText" style="min-height:110px">晚风轻轻吹过，路灯一盏一盏亮起来。今天的你，辛苦了。</textarea>
+        </div>
+        <div class="toolbar" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
+          <div class="field"><label>模型</label><select id="byIdModel"></select></div>
+          <div class="field"><label>语言</label><select id="byIdLang">
+            <option value="">自动判断</option><option value="zh">中文</option><option value="en">英文</option>
+            <option value="ja">日语</option><option value="ko">韩语</option><option value="es">西班牙语</option>
+            <option value="fr">法语</option><option value="de">德语</option><option value="ru">俄语</option></select></div>
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label>语速 <b id="byIdSpeedVal" style="color:var(--accent-2)">1.00×</b></label>
+          <input id="byIdSpeed" type="range" min="0.5" max="2" step="0.05" value="1"
+                 style="width:100%;accent-color:var(--accent)">
+        </div>
+        <div class="drow" style="align-items:center">
+          <button class="btn btn-pri" id="byIdGo">开始合成</button>
+          <span class="count" id="byIdHint"></span>
+        </div>
+        <div id="byIdResult" class="hidden" style="margin-top:14px">
+          <audio id="byIdAudio" controls style="height:38px"></audio>
+          <div style="display:flex;gap:9px;margin-top:10px;flex-wrap:wrap;align-items:center">
+            <a class="btn btn-ghost btn-sm" id="byIdDownload" download>下载音频</a>
+            <span class="count" id="byIdMeta"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 我的试听 -->
+  <section id="tab-mine" class="hidden">
+    <div class="card panel">
+      <div class="switchrow">
+        <button class="switch" id="storeSwitch" aria-label="允许保存在本机"></button>
+        <div>
+          <b>允许保存在本机</b>
+          关闭时，生成的音频只在当前页面里播放，刷新就没了。打开后，音频会存在你自己浏览器的本地存储里（IndexedDB），
+          不会上传到服务器，换浏览器或清缓存就会消失。
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <span class="count" id="clipCount">共 0 条</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" id="clearBtn">清空记录</button>
+        </div>
+      </div>
+      <div class="clips" id="clips">
+        <div class="empty">还没有试听记录～ 去音色库挑一个试试吧</div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- 接口文档 -->
+  <section id="tab-docs" class="hidden">
+    <div class="card panel doccard">
+      <div class="docwrap">
+        <div class="doc">
+          <nav class="doctoc" id="doctoc"></nav>
+          <div class="docbody">
+
+          <h2>接入说明</h2>
+          <p class="lead">这个试听台同时提供了一个 <b>OpenAI 兼容</b>的语音合成网关，任何支持 OpenAI TTS 的客户端
+            （openai SDK、LobeChat、Open WebUI、各种朗读插件）都能直接把地址换过来用。
+            后端仍是 Breeze Blue 官方模型，<b>key 用你自己的</b>，服务器只做转发、不留存。</p>
+
+          <h3>基础地址</h3>
+          <div class="code"><button class="cp">复制</button><pre><span class="baseph">https://voice.example.com/v1</span></pre></div>
+
+          <h3>鉴权</h3>
+          <p>把你在 <a class="lnk" href="https://breezeblue.ai/app/developer/api-keys" target="_blank" rel="noopener noreferrer">Breeze 后台</a>
+            创建的 key（<code>brz_</code> 开头）放进请求头：</p>
+          <div class="code"><button class="cp">复制</button><pre>Authorization: Bearer brz_你的key</pre></div>
+          <p class="note">也支持 <code>xi-api-key: brz_...</code> 或 <code>X-BB-Key: brz_...</code>。key 不会被保存到服务器。</p>
+
+          <h3>方式一：OpenAI 兼容（推荐）</h3>
+          <div class="code"><button class="cp">复制</button><pre>curl <span class="baseph">https://voice.example.com/v1</span>/audio/speech \
+  -H "Authorization: Bearer brz_你的key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "breeze-tts-2",
+    "input": "你好，这是一段测试语音。",
+    "voice": "voc_rh6e8hdbraz6",
+    "response_format": "mp3",
+    "speed": 1.0
+  }' --output hello.mp3</pre></div>
+
+          <div class="code"><button class="cp">复制</button><pre># Python：直接复用官方 openai 库，只改 base_url
+from openai import OpenAI
+
+client = OpenAI(base_url="<span class="baseph">https://voice.example.com/v1</span>", api_key="brz_你的key")
+
+resp = client.audio.speech.create(
+    model="breeze-tts-2",
+    voice="voc_rh6e8hdbraz6",
+    input="你好，这是一段测试语音。",
+    response_format="mp3",
+)
+open("hello.mp3", "wb").write(resp.read())</pre></div>
+
+          <div class="code"><button class="cp">复制</button><pre>// Node.js
+import OpenAI from "openai";
+import fs from "node:fs";
+
+const client = new OpenAI({ baseURL: "<span class="baseph">https://voice.example.com/v1</span>", apiKey: "brz_你的key" });
+const res = await client.audio.speech.create({
+  model: "breeze-tts-2",
+  voice: "voc_rh6e8hdbraz6",
+  input: "你好，这是一段测试语音。",
+  response_format: "mp3",
+});
+fs.writeFileSync("hello.mp3", Buffer.from(await res.arrayBuffer()));</pre></div>
+
+          <h3>方式二：直接调 Breeze 官方 API</h3>
+          <p>如果你不需要中转，也可以直接打官方端点（需要 Breeze 的 key）：</p>
+          <div class="code"><button class="cp">复制</button><pre>curl -X POST "https://api.breeze.blue/v1/text-to-speech/voc_rh6e8hdbraz6?output_format=mp3" \
+  -H "xi-api-key: brz_你的key" \
+  -H "content-type: application/json" \
+  -d '{"text": "你好，这是一段测试语音。", "model_id": "breeze-tts-2", "language_code": "zh"}' \
+  --output hello.mp3</pre></div>
+          <p class="note">注意：官方 API <b>不允许浏览器跨域直连</b>（没有 CORS 头），网页里调要用本页的方式一。</p>
+
+          <h3>参数说明</h3>
+          <table class="apitable">
+            <thead><tr><th>参数</th><th>必填</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><code>input</code></td><td>是</td><td>要合成的文字，默认上限 1000 字（本网关放宽到 2000）</td></tr>
+              <tr><td><code>voice</code></td><td>是</td><td>Breeze 音色 ID，<code>voc_</code> 开头；从音色库卡片右下角「复制 ID」获取</td></tr>
+              <tr><td><code>model</code></td><td>否</td><td><code>breeze-tts-2</code>（中/英）或 <code>breeze-tts-2-multilingual</code>（51 种语言）；也接受 <code>tts-1</code> 这类别名</td></tr>
+              <tr><td><code>response_format</code></td><td>否</td><td><code>mp3</code>（默认）、<code>wav</code>、<code>opus</code>、<code>aac</code>、<code>flac</code>、<code>pcm</code></td></tr>
+              <tr><td><code>speed</code></td><td>否</td><td>语速 0.5 ~ 2.0，保持音高不变，默认 1.0</td></tr>
+              <tr><td><code>instructions</code></td><td>否</td><td>表演指令，如「用轻快的语气，句尾上扬」，用与文本相同的语言写</td></tr>
+              <tr><td><code>language</code></td><td>否</td><td>ISO 639-1 两字母语言码，不传则由模型自动判断</td></tr>
+            </tbody>
+          </table>
+
+          <h3>返回与错误</h3>
+          <p>成功时直接返回音频二进制，<code>Content-Type</code> 对应格式，响应头带 <code>X-History-Id</code>。
+            失败时返回 OpenAI 风格的错误体：</p>
+          <table class="apitable">
+            <thead><tr><th>状态码</th><th>type</th><th>常见原因</th></tr></thead>
+            <tbody>
+              <tr><td>400</td><td>invalid_request_error</td><td>缺少 input / voice，或音色 ID 格式不对</td></tr>
+              <tr><td>401</td><td>authentication_error</td><td>key 缺失、拼错或已被禁用</td></tr>
+              <tr><td>402</td><td>insufficient_quota</td><td>你 key 名下额度不足</td></tr>
+              <tr><td>429</td><td>rate_limit_error</td><td>请求太密集，或同时生成数量超限，稍后重试</td></tr>
+            </tbody>
+          </table>
+
+          <h3>语言代码</h3>
+          <p><code>breeze-tts-2</code> 支持 <code>zh</code>、<code>en</code>；<code>breeze-tts-2-multilingual</code> 支持 51 种：
+            af ar bg bn bs ca cs da de el en es et eu fa fi fr gl he hi hu id is it ja kn ko lt mr ms ne nl no pl pt ro ru sk sl sq sv sw ta te th tl tr uk ur vi zh。</p>
+
+          <h3>注意事项</h3>
+          <ul class="doclist">
+            <li>这个网关<b>不存储</b>你的 key：只在单次请求中转发给 Breeze，不写数据库、不写日志。</li>
+            <li>省钱提示：同一段文本反复请求会重复计费，调试时先用短句。</li>
+            <li>免费套餐有「同时生成数量」限制，批量合成请控制并发、失败后指数退避重试。</li>
+            <li>请勿把这个地址当作公共免费接口对外分发；每个人用自己的 key。</li>
+          </ul>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    API key 只保存在你自己的浏览器里 · 服务器只在转发请求时短暂使用，不存储、不记录<br>
+    音色与模型来自 Breeze Blue 官方 API
+  </footer>
+</div>
+
+<!-- 设置抽屉 -->
+<div class="drawer" id="drawer">
+  <aside class="drawer-panel">
+    <div class="drawer-head">
+      <h3>设置</h3>
+      <button class="iconbtn" id="drawerClose" aria-label="关闭">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body">
+      <section class="dsection">
+        <h4>
+          <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--accent);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><circle cx="8" cy="16" r="3.6"/><path d="m10.6 13.4 8.6-8.6M16.6 7.4l2.3 2.3M14.2 5l2.3 2.3"/></svg>
+          Breeze API key
+        </h4>
+        <p>试听官方音色用不到 key；文本合成、创作音色才需要。key 只保存在这台设备的浏览器里。</p>
+        <div class="field">
+          <label>API key（brz_ 开头）</label>
+          <div class="krow">
+            <input id="keyInput" type="password" placeholder="在这里粘贴 brz_ 开头的 key" autocomplete="off" spellcheck="false">
+            <button class="btn btn-ghost btn-sm" id="toggleKey" type="button">显示</button>
+          </div>
+        </div>
+        <div class="drow">
+          <button class="btn btn-pri btn-sm" id="keySave">保存并测试</button>
+          <button class="btn btn-ghost btn-sm" id="keyClear">清除</button>
+        </div>
+        <div class="kstatus" id="kStatus">还没有保存 key</div>
+        <p style="margin:11px 0 0">
+          <a class="lnk" href="https://breezeblue.ai/app/developer/api-keys" target="_blank" rel="noopener noreferrer">去 Breeze 创建 API key →</a>
+        </p>
+      </section>
+
+      <section class="dsection">
+        <h4>
+          <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:var(--accent);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+          音频保存
+        </h4>
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <button class="switch" id="setStoreSwitch" aria-label="允许保存在本机"></button>
+          <div style="font-size:12.2px;color:var(--ink-3);line-height:1.6">
+            允许保存在本机：合成的音频会存进这台设备的浏览器（本地存储），不上传服务器。
+            关闭时音频只在当前页面播放，刷新即失效。
+            <div style="margin-top:7px;color:var(--ink-2)">已保存 <b id="setClipCount">0</b> 条</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="dsection">
+        <h4>
+          <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:var(--accent);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+          说明
+        </h4>
+        <p style="margin:0">音色与模型来自 Breeze Blue 官方 API；每次合成会消耗你自己 key 名下账户的额度。
+          不同浏览器各自保存 key 和音频，互不影响。</p>
+      </section>
+    </div>
+  </aside>
+</div>
+
+<!-- 合成弹层 -->
+<div class="modal" id="synModal">
+  <div class="modal-box">
+    <h3 id="synTitle">用这个音色合成</h3>
+    <p class="hint" id="synSub"></p>
+    <div class="field">
+      <label>要念的文字（最多 2000 字）</label>
+      <textarea id="synText" style="min-height:110px"></textarea>
+    </div>
+    <div class="toolbar" style="grid-template-columns:1fr 1fr;margin-bottom:6px">
+      <div class="field"><label>模型</label><select id="synModel"></select></div>
+      <div class="field"><label>语言</label><select id="synLang">
+        <option value="">自动判断</option><option value="zh">中文</option><option value="en">英文</option></select></div>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between">
+      <span class="count" id="synHint"></span>
+      <div style="display:flex;gap:9px">
+        <button class="btn btn-ghost" id="synCancel">关闭</button>
+        <button class="btn btn-pri" id="synGo">开始合成</button>
+      </div>
+    </div>
+    <div id="synResult" class="hidden" style="margin-top:14px">
+      <audio id="synAudio" controls style="height:38px"></audio>
+      <div style="display:flex;gap:9px;margin-top:10px;flex-wrap:wrap">
+        <a class="btn btn-ghost btn-sm" id="synDownload" download>下载音频</a>
+        <span class="count" id="synMeta"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const LANG_NAMES = {zh:'中文', en:'英语', ja:'日语', ko:'韩语', es:'西班牙语', fr:'法语', de:'德语',
+    ru:'俄语', pt:'葡萄牙语', it:'意大利语', ar:'阿拉伯语', hi:'印地语', th:'泰语', vi:'越南语', id:'印尼语', tr:'土耳其语'};
+  const TONE_CN = {warm:'温暖', calm:'沉稳', bright:'明亮', gentle:'柔和', energetic:'有活力',
+    authoritative:'权威', sincere:'真诚', weary:'慵懒', precise:'精准', refined:'精致', urgent:'急促',
+    friendly:'亲切', articulate:'口齿清晰', steady:'稳定', playful:'俏皮', compassionate:'有共情',
+    reflective:'沉思', measured:'从容', rhythmic:'有节奏', passionate:'热情'};
+  const ACCENT_CN = {american:'美音', british:'英音', scottish:'苏格兰腔', irish:'爱尔兰腔',
+    australian:'澳洲腔', canadian:'加拿大腔', us_southern:'美国南部腔', us_new_york:'纽约腔',
+    indian:'印度腔', south_african:'南非腔', russian:'俄式英语', chinese:'普通话',
+    japanese:'日式', korean:'韩式', cantonese:'粤语腔', mandarin_northeastern:'东北腔',
+    mandarin_shaanxi:'陕西腔', mandarin_shanghai:'上海腔', mandarin_sichuan:'四川腔',
+    mandarin_henan:'河南腔', mandarin_beijing:'北京腔', mandarin_taiwan:'台湾腔',
+    mandarin_guangdong:'广东腔', mandarin_yunnan:'云南腔'};
+  const LS_KEY = 'bb_key', LS_STORE = 'bb_store', LS_PREF = 'bb_pref';
+
+  let state = {
+    key: localStorage.getItem(LS_KEY) || '',
+    storeEnabled: localStorage.getItem(LS_STORE) === '1',
+    voices: [], page: 0, hasMore: false, total: 0, loading: false,
+    models: [], pref: JSON.parse(localStorage.getItem(LS_PREF) || '{}'),
+    sessionClips: [],     // 内存里的（未开启存储时）
+    player: null, currentVoice: null,
+  };
+
+  /* ---------- 工具 ---------- */
+  function toast(msg, bad) {
+    const t = $('toast'); t.textContent = msg; t.className = 'show' + (bad ? ' bad' : '');
+    clearTimeout(t._h); t._h = setTimeout(() => t.className = '', 2800);
+  }
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtTime = (ts) => new Date(ts).toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+  async function api(path, opts = {}) {
+    const headers = Object.assign({'Content-Type': 'application/json'}, opts.headers || {});
+    if (state.key) headers['X-BB-Key'] = state.key;
+    const r = await fetch(path, Object.assign({}, opts, {headers}));
+    if (opts.raw) {
+      if (!r.ok) {
+        let j = {}; try { j = await r.json(); } catch (e) {}
+        throw new Error(j.message || ('HTTP ' + r.status));
+      }
+      return {blob: await r.blob(), headers: r.headers};
+    }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.message || ('HTTP ' + r.status));
+    return j;
+  }
+
+  /* ---------- key ---------- */
+  function paintKey() {
+    const dot = $('keyStateDot'), txt = $('keyStateText'), st = $('kStatus');
+    dot.className = 'dot';
+    if (!state.key) {
+      txt.textContent = '未配置 API key';
+      st.className = 'kstatus'; st.textContent = '还没有保存 key';
+      return;
+    }
+    dot.classList.add('on');
+    txt.textContent = 'key ' + state.key.slice(0, 8) + '…' + state.key.slice(-4);
+    st.className = 'kstatus ok'; st.textContent = '已保存到这台设备的浏览器 ✅';
+  }
+  function openSettings() {
+    $('keyInput').value = state.key;
+    $('keyInput').type = 'password';
+    $('toggleKey').textContent = '显示';
+    $('drawer').classList.add('show');
+    setTimeout(() => $('keyInput').focus(), 80);
+  }
+  function closeSettings() { $('drawer').classList.remove('show'); }
+  $('settingsBtn').onclick = openSettings;
+  $('drawerClose').onclick = closeSettings;
+  $('drawer').addEventListener('click', (e) => { if (e.target.id === 'drawer') closeSettings(); });
+
+  $('toggleKey').onclick = () => {
+    const i = $('keyInput');
+    const hidden = i.type === 'password';
+    i.type = hidden ? 'text' : 'password';
+    $('toggleKey').textContent = hidden ? '隐藏' : '显示';
+  };
+  $('keyClear').onclick = () => {
+    if (!state.key) { toast('现在还没有保存 key'); return; }
+    if (!confirm('确定要清除这台设备上保存的 API key 吗？清除后需要重新粘贴才能合成。')) return;
+    localStorage.removeItem(LS_KEY); state.key = ''; $('keyInput').value = '';
+    paintKey(); toast('已清除这台设备上保存的 key');
+  };
+  $('keySave').onclick = async () => {
+    const v = $('keyInput').value.trim();
+    if (!v) { toast('先粘贴 key 吧', true); return; }
+    if (!v.startsWith('brz_')) { toast('key 应该以 brz_ 开头', true); return; }
+    const btn = $('keySave'); btn.disabled = true; btn.textContent = '测试中…';
+    const old = state.key; state.key = v;
+    try {
+      const r = await api('/api/key-check', {method: 'POST', body: '{}'});
+      localStorage.setItem(LS_KEY, v); paintKey();
+      $('kStatus').className = 'kstatus ok';
+      const bal = r.balance != null ? ` · 余额 ${r.balance}` : '';
+      toast('key 可用' + bal + ' ✅');
+      loadMine();
+    } catch (e) {
+      state.key = old;
+      toast('key 测试失败：' + e.message, true);
+    } finally { btn.disabled = false; btn.textContent = '保存并测试'; }
+  };
+
+  /* ---------- 存储开关 ---------- */
+  function paintStore() {
+    const cls = 'switch' + (state.storeEnabled ? ' on' : '');
+    $('storeSwitch').className = cls;
+    $('setStoreSwitch').className = cls;
+    $('clipCount').textContent = '共 ' + (state.storeEnabled ? '…' : state.sessionClips.length) + ' 条';
+  }
+  async function setStore(on) {
+    state.storeEnabled = on;
+    localStorage.setItem(LS_STORE, on ? '1' : '0');
+    if (on && state.sessionClips.length) {
+      // 开启时把本次页面里已经生成的音频一起迁移到本机存储，避免"刚开的开关就丢"
+      for (const c of state.sessionClips) { try { await idbPut(c); } catch (e) {} }
+    }
+    paintStore(); await loadMine();
+    toast(on ? '已开启本地保存，音频会存在这台设备上' : '已关闭本地保存，音频只在本次页面里');
+  }
+  $('storeSwitch').onclick = () => setStore(!state.storeEnabled);
+  $('setStoreSwitch').onclick = () => setStore(!state.storeEnabled);
+
+  /* ---------- IndexedDB ---------- */
+  function db() {
+    return new Promise((res, rej) => {
+      const rq = indexedDB.open('breeze-voice', 1);
+      rq.onupgradeneeded = () => {
+        const d = rq.result;
+        if (!d.objectStoreNames.contains('clips')) d.createObjectStore('clips', {keyPath: 'id'});
+      };
+      rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+    });
+  }
+  async function idbPut(clip) {
+    const d = await db();
+    return new Promise((res, rej) => {
+      const tx = d.transaction('clips', 'readwrite'); tx.objectStore('clips').put(clip);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }
+  async function idbAll() {
+    const d = await db();
+    return new Promise((res, rej) => {
+      const rq = d.transaction('clips', 'readonly').objectStore('clips').getAll();
+      rq.onsuccess = () => res(rq.result.sort((a, b) => b.ts - a.ts)); rq.onerror = () => rej(rq.error);
+    });
+  }
+  async function idbClear() {
+    const d = await db();
+    return new Promise((res, rej) => {
+      const tx = d.transaction('clips', 'readwrite'); tx.objectStore('clips').clear();
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }
+  async function idbDel(id) {
+    const d = await db();
+    return new Promise((res, rej) => {
+      const tx = d.transaction('clips', 'readwrite'); tx.objectStore('clips').delete(id);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }
+
+  /* ---------- 音色库 ---------- */
+  function langOptions() {
+    const common = ['zh', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'ru', 'pt', 'it', 'ar', 'hi', 'th', 'vi', 'id', 'tr'];
+    const sel = $('lang');
+    sel.innerHTML = '<option value="">全部语言</option>' +
+      common.map(c => `<option value="${c}">${LANG_NAMES[c] || c}</option>`).join('');
+    sel.value = state.pref.lang || 'zh';
+  }
+  function collectFilters() {
+    return {
+      search: $('q').value.trim(),
+      language_code: $('lang').value,
+      gender: $('gender').value,
+      category: $('category').value,
+      sort: $('sort').value,
+    };
+  }
+  function voiceCard(v) {
+    const lang = LANG_NAMES[v.lang] || (v.lang || '').toUpperCase();
+    const meta = [];
+    if (lang) meta.push(`<span class="pill lang">${esc(lang)}</span>`);
+    const g = {female: '女声', male: '男声', neutral: '中性'}[v.gender];
+    if (g) meta.push(`<span class="pill">${g}</span>`);
+    if (v.accent) meta.push(`<span class="pill">${esc(ACCENT_CN[v.accent] || v.accent)}</span>`);
+    const maxPill = window.innerWidth < 700 ? 2 : 4;
+    meta.splice(maxPill);
+    (v.tone || []).slice(0, 2).forEach(t => meta.push(`<span class="pill">${esc(TONE_CN[t] || t)}</span>`));
+    meta.splice(maxPill);
+    return `<article class="card vcard">
+      <h4 title="${esc(v.name || v.voice_id)}">${esc(v.name || v.voice_id)}</h4>
+      <div class="meta">${meta.join('')}</div>
+      <div class="vdesc" title="${esc(v.desc || '')}">${esc(v.desc || '（这个音色没有写简介）')}</div>
+      ${v.preview ? `<audio preload="none" controls src="${esc(v.preview)}"></audio>` : '<div class="noaudio">暂无试听</div>'}
+      <div class="vactions">
+        <button class="btn btn-ghost btn-sm" data-syn="${esc(v.voice_id)}" data-name="${esc(v.name || '')}">用它合成</button>
+        <button class="btn btn-ghost btn-sm copyid" data-copyid="${esc(v.voice_id)}" title="复制音色 ID">ID</button>
+      </div>
+    </article>`;
+  }
+
+  /* ---- 分页：sort=trend 只支持 next_page_token（page 必须为 1），
+          所以统一走游标，上一页靠前端 token 栈 ---- */
+  const MIN_W = 218, MIN_H = 184, GAP = 10;
+  function computeGrid() {
+    const g = $('vgrid');
+    const W = g.clientWidth, H = g.clientHeight;
+    if (!W || !H) return {cols: 1, rows: 1};
+    const small = window.innerWidth < 700;
+    const minW = small ? 150 : MIN_W;
+    const minH = small ? 126 : MIN_H;
+    const cols = Math.max(1, Math.floor((W + GAP) / (minW + GAP)));
+    const rows = Math.max(1, Math.floor((H + GAP) / (minH + GAP)));
+    g.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
+    g.style.gridTemplateRows = `repeat(${rows}, minmax(0,1fr))`;
+    return {cols, rows};
+  }
+  let lib = {tokens: [null], idx: 0, next: null, hasMore: false, total: 0, loading: false, pageSize: 0};
+
+  async function loadPage(reset) {
+    if (lib.loading) return;
+    const size = computeGrid();
+    const pageSize = Math.min(size.cols * size.rows, 60);
+    if (reset) lib = {tokens: [null], idx: 0, next: null, hasMore: false, total: 0, loading: false, pageSize};
+    lib.loading = true;
+    $('nextBtn').disabled = true; $('prevBtn').disabled = true;
+    $('libCount').textContent = '正在读取…';
+    $('vgrid').style.opacity = .5;
+    try {
+      const f = collectFilters();
+      const cursor = lib.tokens[lib.idx];
+      const qs = new URLSearchParams(Object.assign({page_size: pageSize, voice_type: 'default'}, f));
+      if (cursor) qs.set('cursor', cursor);
+      const d = await api('/api/voices?' + qs.toString());
+      lib.pageSize = pageSize;
+      lib.total = d.total || 0;
+      lib.hasMore = !!d.has_more;
+      lib.next = d.next_page_token || null;
+      const list = d.voices || [];
+      $('vgrid').innerHTML = list.length ? list.map(voiceCard).join('')
+        : '<div class="empty" style="grid-column:1/-1;align-self:center">没有找到匹配的音色，换个关键词试试～</div>';
+      const narrow = window.innerWidth < 700;
+      $('libCount').textContent = narrow
+        ? `第 ${lib.idx + 1} 页 · 共 ${lib.total.toLocaleString()} 个`
+        : `共 ${lib.total.toLocaleString()} 个 · 第 ${lib.idx + 1} 页 · 本页 ${list.length} 个`;
+      $('prevBtn').disabled = lib.idx === 0;
+      $('nextBtn').disabled = !lib.hasMore;
+      state.pref.lang = f.language_code; localStorage.setItem(LS_PREF, JSON.stringify(state.pref));
+    } catch (e) {
+      $('vgrid').innerHTML = '<div class="empty" style="grid-column:1/-1;align-self:center">读取失败：' + esc(e.message) + '</div>';
+      $('libCount').textContent = '读取失败';
+    } finally {
+      lib.loading = false; $('vgrid').style.opacity = 1;
+    }
+  }
+  function goNext() {
+    if (!lib.hasMore || lib.loading) return;
+    lib.tokens = lib.tokens.slice(0, lib.idx + 1);
+    lib.tokens.push(lib.next);
+    lib.idx += 1;
+    loadPage(false);
+  }
+  function goPrev() {
+    if (lib.idx === 0 || lib.loading) return;
+    lib.idx -= 1;
+    loadPage(false);
+  }
+  let qTimer = null;
+  $('q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(() => loadPage(true), 420); });
+  ['lang', 'gender', 'category', 'sort'].forEach(id => $(id).addEventListener('change', () => loadPage(true)));
+  $('prevBtn').onclick = goPrev;
+  $('nextBtn').onclick = goNext;
+  $('refreshBtn').onclick = () => { $('filters').classList.remove('open'); loadPage(true); };
+  $('filterToggle').onclick = () => {
+    const box = $('filters');
+    box.classList.toggle('open');
+    $('filterToggle').textContent = box.classList.contains('open') ? '收起' : '筛选';
+    setTimeout(() => loadPage(true), 60);
+  };
+
+  // 视口变了就重算每页容量，保证始终吃满且不出现滚动
+  let rzTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => {
+      const {cols, rows} = computeGrid();
+      if (cols * rows !== lib.pageSize) loadPage(true);
+    }, 280);
+  });
+
+  /* ---------- 合成 ---------- */
+  function fillModels(sel) {
+    sel.innerHTML = state.models.map(m => `<option value="${esc(m.model_id)}">${esc(m.name || m.model_id)}</option>`).join('')
+      || '<option value="">默认模型</option>';
+  }
+  async function loadModels() {
+    try {
+      const d = await api('/api/models');
+      state.models = d.models || [];
+      fillModels($('synModel')); fillModels($('dModel')); fillModels($('byIdModel'));
+    } catch (e) { /* 没 key 也能用服务器凭据读模型 */ }
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-syn]');
+    if (!b) return;
+    openSynth({voice_id: b.dataset.syn, name: b.dataset.name});
+  });
+  function openSynth(voice) {
+    state.currentVoice = voice;
+    $('synTitle').textContent = '用「' + (voice.name || voice.voice_id) + '」合成';
+    $('synSub').textContent = '合成的音频会计入你 key 名下账户的额度（每次请求都会真实扣费）。';
+    $('synResult').classList.add('hidden');
+    $('synHint').textContent = '';
+    $('synText').value = $('synText').value || '晚风轻轻吹过，路灯一盏一盏亮起来。今天的你，辛苦了。';
+    $('synModal').classList.add('show');
+  }
+  $('synCancel').onclick = () => $('synModal').classList.remove('show');
+  $('synGo').onclick = async () => {
+    if (!state.key) { toast('先配置 API key 才能合成哦', true); openSettings(); return; }
+    const text = $('synText').value.trim();
+    if (!text) { toast('写点要念的文字吧', true); return; }
+    const btn = $('synGo'); btn.disabled = true; btn.textContent = '合成中…';
+    $('synHint').textContent = '正在生成，通常几秒到十几秒…';
+    try {
+      const {blob, headers} = await api('/api/tts', {
+        method: 'POST', raw: true,
+        body: JSON.stringify({
+          voice_id: state.currentVoice.voice_id, text,
+          model_id: $('synModel').value || null,
+          language_code: $('synLang').value || null,
+        })
+      });
+      const url = URL.createObjectURL(blob);
+      $('synAudio').src = url;
+      $('synAudio').play().catch(() => {});
+      $('synResult').classList.remove('hidden');
+      $('synDownload').href = url;
+      $('synDownload').download = `breeze-${(state.currentVoice.name || 'voice')}-${Date.now()}.mp3`;
+      $('synMeta').textContent = (blob.size / 1024).toFixed(0) + ' KB';
+      $('synHint').textContent = '完成 ✅';
+      await rememberClip({
+        voiceName: state.currentVoice.name, voiceId: state.currentVoice.voice_id,
+        text, model: $('synModel').value, lang: $('synLang').value, blob,
+      });
+    } catch (e) {
+      $('synHint').textContent = '失败：' + e.message;
+      toast(e.message, true);
+    } finally { btn.disabled = false; btn.textContent = '开始合成'; }
+  };
+
+  /* ---------- 记录 ---------- */
+  async function rememberClip(info) {
+    const clip = {id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), ts: Date.now(),
+      voiceName: info.voiceName || '', voiceId: info.voiceId || '', text: info.text || '',
+      model: info.model || '', lang: info.lang || '', blob: info.blob};
+    state.sessionClips.unshift(clip);
+    if (state.storeEnabled) {
+      try { await idbPut(clip); } catch (e) { toast('本地保存失败：' + e.message, true); }
+    }
+    paintStore(); if (!$('tab-mine').classList.contains('hidden')) loadMine();
+  }
+  async function loadMine() {
+    let clips = state.sessionClips;
+    if (state.storeEnabled) {
+      try { clips = await idbAll(); } catch (e) { clips = state.sessionClips; }
+    }
+    $('clipCount').textContent = `共 ${clips.length} 条` + (state.storeEnabled ? '（已存在本机）' : '（仅本次页面）');
+    $('setClipCount').textContent = clips.length;
+    const box = $('clips');
+    if (!clips.length) {
+      box.innerHTML = '<div class="empty">还没有试听记录～ 去音色库挑一个试试吧</div>';
+      return;
+    }
+    box.innerHTML = clips.map(c => {
+      const url = c.blob ? URL.createObjectURL(c.blob) : '';
+      return `<div class="clip">
+        <div>
+          <div class="t">${esc(c.text.slice(0, 90))}${c.text.length > 90 ? '…' : ''}</div>
+          <div class="s">${esc(c.voiceName || c.voiceId)} · ${fmtTime(c.ts)}${c.blob ? ' · ' + (c.blob.size / 1024).toFixed(0) + ' KB' : ''}</div>
+          ${url ? `<audio preload="none" src="${url}" controls style="height:32px;margin-top:8px"></audio>` : ''}
+        </div>
+        <div class="acts">
+          ${url ? `<a class="btn btn-ghost btn-sm" href="${url}" download="breeze-${esc(c.voiceName || 'voice')}-${c.ts}.mp3">下载</a>` : ''}
+          <button class="btn btn-ghost btn-sm" data-del="${esc(c.id)}">删除</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  $('clips').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-del]');
+    if (!b) return;
+    const id = b.dataset.del;
+    state.sessionClips = state.sessionClips.filter(c => c.id !== id);
+    if (state.storeEnabled) { try { await idbDel(id); } catch (err) {} }
+    loadMine();
+  });
+  $('clearBtn').onclick = async () => {
+    if (!confirm('确定清空所有试听记录？')) return;
+    state.sessionClips = [];
+    if (state.storeEnabled) { try { await idbClear(); } catch (e) {} }
+    loadMine(); toast('已清空');
+  };
+
+  /* ---------- 音色创作 ---------- */
+  $('descChips').addEventListener('click', (e) => {
+    const c = e.target.closest('.chip');
+    if (c) $('dDesc').value = c.textContent;
+  });
+  $('designBtn').onclick = async () => {
+    if (!state.key) { toast('先配置 API key 才能创作音色', true); openSettings(); return; }
+    const desc = $('dDesc').value.trim();
+    if (desc.length < 3) { toast('描述至少写几个字吧', true); return; }
+    const btn = $('designBtn'); btn.disabled = true; btn.textContent = '生成中…';
+    $('designHint').textContent = '正在生成候选，可能要十几秒…';
+    $('cands').innerHTML = '<div class="empty">生成中…</div>';
+    try {
+      const d = await api('/api/design', {
+        method: 'POST',
+        body: JSON.stringify({
+          voice_description: desc,
+          text: $('dText').value.trim(),
+          model_id: $('dModel').value || null,
+          preview_count: parseInt($('dCount').value, 10),
+        })
+      });
+      const list = d.previews || [];
+      if (!list.length) throw new Error('没有返回候选');
+      $('cands').innerHTML = list.map((p, i) => {
+        const src = `data:${p.media_type || 'audio/mpeg'};base64,${p.audio_base_64}`;
+        return `<div class="cand">
+          <div class="row"><b>候选 ${i + 1}</b><span>${p.duration_secs ? p.duration_secs.toFixed(1) + ' 秒' : ''}</span></div>
+          <audio preload="metadata" src="${src}" controls style="height:32px"></audio>
+          <div class="cand-acts" style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-pri btn-sm" data-save="${esc(p.generated_voice_id)}">保存到我的音色</button>
+            <a class="btn btn-ghost btn-sm" download="breeze-design-${i + 1}.mp3" href="${src}">下载</a>
+            <span class="count" style="font-size:11.5px">保存后即可反复合成</span>
+          </div>
+        </div>`;
+      }).join('');
+      $('designHint').textContent = `生成了 ${list.length} 个候选 ✅ 试听后可以保存或直接合成`;
+    } catch (e) {
+      $('cands').innerHTML = '<div class="empty">生成失败：' + esc(e.message) + '</div>';
+      $('designHint').textContent = '';
+      toast(e.message, true);
+    } finally { btn.disabled = false; btn.textContent = '生成音色候选'; }
+  };
+  $('cands').addEventListener('click', async (e) => {
+    const save = e.target.closest('[data-save]');
+    if (save) {
+      if (!state.key) { toast('先配置 API key', true); openSettings(); return; }
+      const desc = $('dDesc').value.trim();
+      const nm = (desc.slice(0, 24) || '设计音色') + ' · ' + new Date().toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+      save.disabled = true; save.textContent = '保存中…';
+      try {
+        const d = await api('/api/design/save', {method: 'POST', body: JSON.stringify({
+          generated_voice_id: save.dataset.save, name: nm,
+          description: desc, language_code: /[\u4e00-\u9fa5]/.test($('dText').value) ? 'zh' : null,
+        })});
+        save.outerHTML = `<button class="btn btn-ghost btn-sm" data-syn="${esc(d.voice_id)}" data-name="${esc(d.name || nm)}">用这个音色合成</button>`;
+        toast('已保存到你的 Breeze 音色库 ✅');
+      } catch (err) {
+        save.disabled = false; save.textContent = '保存到我的音色';
+        toast(err.message, true);
+      }
+    }
+  });
+
+  /* ---------- Tabs ---------- */
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+    ['lib', 'create', 'byid', 'mine', 'docs'].forEach(k => $('tab-' + k).classList.toggle('hidden', k !== t.dataset.tab));
+    if (t.dataset.tab === 'mine') loadMine();
+  });
+
+  document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', (e) => {
+    if (e.target === m) m.classList.remove('show');
+  }));
+
+  /* ---------- 复制（带降级） ---------- */
+  async function copyText(txt) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(txt); return true; }
+    } catch (e) {}
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  /* ---------- 按 ID 合成 ---------- */
+  $('byIdSpeed').addEventListener('input', () => {
+    $('byIdSpeedVal').textContent = Number($('byIdSpeed').value).toFixed(2) + '×';
+  });
+  $('byIdInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('byIdLookup').click(); });
+
+  function renderVoiceInfo(v) {
+    const lang = LANG_NAMES[v.lang] || (v.lang || '').toUpperCase();
+    const pills = [];
+    if (lang) pills.push(`<span class="pill lang">${esc(lang)}</span>`);
+    const g = {female: '女声', male: '男声', neutral: '中性'}[v.gender];
+    if (g) pills.push(`<span class="pill">${g}</span>`);
+    if (v.accent) pills.push(`<span class="pill">${esc(ACCENT_CN[v.accent] || v.accent)}</span>`);
+    (v.tone || []).slice(0, 3).forEach(t => pills.push(`<span class="pill">${esc(TONE_CN[t] || t)}</span>`));
+    $('byIdInfo').innerHTML = `<div class="byid-voice">
+      <h4>${esc(v.name || '未命名音色')}</h4>
+      <div class="idline">${esc(v.voice_id)}</div>
+      <div class="meta">${pills.join('')}</div>
+      <p class="d">${esc(v.desc || '（这个音色没有写简介）')}</p>
+      ${v.preview ? `<audio controls preload="none" src="${esc(v.preview)}" style="height:30px;margin-top:10px"></audio>` : ''}
+    </div>`;
+  }
+  $('byIdLookup').onclick = async () => {
+    const id = $('byIdInput').value.trim();
+    if (!id.startsWith('voc_')) { toast('音色 ID 应该以 voc_ 开头', true); return; }
+    const btn = $('byIdLookup'); btn.disabled = true; btn.textContent = '查询中…';
+    try {
+      const d = await api('/api/voice-info?voice_id=' + encodeURIComponent(id));
+      renderVoiceInfo(d.voice);
+    } catch (e) {
+      $('byIdInfo').innerHTML = `<div class="byid-empty">没找到这个音色：${esc(e.message)}</div>`;
+      toast(e.message, true);
+    } finally { btn.disabled = false; btn.textContent = '查一下'; }
+  };
+  $('byIdGo').onclick = async () => {
+    const id = $('byIdInput').value.trim();
+    const text = $('byIdText').value.trim();
+    if (!id.startsWith('voc_')) { toast('先填一个 voc_ 开头的音色 ID', true); return; }
+    if (!text) { toast('写点要念的文字吧', true); return; }
+    if (!state.key) { toast('先配置 API key 才能合成', true); openSettings(); return; }
+    const btn = $('byIdGo'); btn.disabled = true; btn.textContent = '合成中…';
+    $('byIdHint').textContent = '正在生成…';
+    try {
+      const {blob} = await api('/api/tts', {
+        method: 'POST', raw: true,
+        body: JSON.stringify({
+          voice_id: id, text,
+          model_id: $('byIdModel').value || null,
+          language_code: $('byIdLang').value || null,
+          speed: parseFloat($('byIdSpeed').value),
+        })
+      });
+      const url = URL.createObjectURL(blob);
+      $('byIdAudio').src = url;
+      $('byIdAudio').play().catch(() => {});
+      $('byIdResult').classList.remove('hidden');
+      $('byIdDownload').href = url;
+      $('byIdDownload').download = `breeze-${id}-${Date.now()}.mp3`;
+      $('byIdMeta').textContent = (blob.size / 1024).toFixed(0) + ' KB';
+      $('byIdHint').textContent = '完成 ✅';
+      await rememberClip({voiceName: $('byIdInfo').querySelector('h4')?.textContent || id,
+        voiceId: id, text, model: $('byIdModel').value, lang: $('byIdLang').value, blob});
+    } catch (e) {
+      $('byIdHint').textContent = '失败：' + e.message;
+      toast(e.message, true);
+    } finally { btn.disabled = false; btn.textContent = '开始合成'; }
+  };
+
+  /* ---------- 文档页：自动目录 + 复制 ---------- */
+  (function buildDocs() {
+    const heads = [...document.querySelectorAll('#tab-docs .docbody h3')];
+    const toc = $('doctoc');
+    toc.innerHTML = heads.map((h, i) => {
+      const id = 'docsec-' + i;
+      h.id = id;
+      return `<a href="#${id}" data-sec="${id}">${esc(h.textContent)}</a>`;
+    }).join('');
+    toc.addEventListener('click', (e) => {
+      const a = e.target.closest('a');
+      if (!a) return;
+      e.preventDefault();
+      const el = document.getElementById(a.dataset.sec);
+      if (!el) return;
+      el.scrollIntoView({behavior: 'smooth', block: 'start'});
+      toc.querySelectorAll('a').forEach(x => x.classList.toggle('on', x === a));
+    });
+
+    // 滚动时高亮当前章节
+    const wrap = document.querySelector('.docwrap');
+    let tick = null;
+    wrap.addEventListener('scroll', () => {
+      if (tick) return;
+      tick = requestAnimationFrame(() => {
+        tick = null;
+        const top = wrap.scrollTop + 70;
+        let cur = heads[0];
+        for (const h of heads) { if (h.offsetTop <= top) cur = h; }
+        toc.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.sec === (cur && cur.id)));
+      });
+    });
+  })();
+
+  document.addEventListener('click', async (e) => {
+    const cp = e.target.closest('.code .cp');
+    if (cp) {
+      const pre = cp.parentElement.querySelector('pre');
+      const ok = await copyText(pre.innerText);
+      cp.textContent = ok ? '已复制' : '复制失败';
+      setTimeout(() => { cp.textContent = '复制'; }, 1600);
+      return;
+    }
+    const ci = e.target.closest('[data-copyid]');
+    if (ci) {
+      const ok = await copyText(ci.dataset.copyid);
+      toast(ok ? '已复制音色 ID：' + ci.dataset.copyid : '复制失败，请手动选中文案', !ok);
+    }
+  });
+
+  // 同一时刻只允许一个音频在播（避免多个试听叠在一起）
+  document.addEventListener('play', (e) => {
+    document.querySelectorAll('audio').forEach(a => { if (a !== e.target) { try { a.pause(); } catch (err) {} } });
+  }, true);
+
+  /* ---------- 启动 ---------- */
+  paintKey(); paintStore(); langOptions(); loadModels(); loadPage(true); loadMine();
+
+  // 站点地址来自后端：文档里的示例地址跟着实际部署走，不用改源码
+  fetch('/api/config').then(r => r.json()).then((c) => {
+    if (!c || !c.base_url) return;
+    document.querySelectorAll('.baseph').forEach(el => { el.textContent = c.base_url; });
+    if (c.demo) $('demoChip').classList.remove('hidden');
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>
